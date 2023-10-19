@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
 
 	"github.com/bensch98/kube-knockout/internal/knockout"
 	"github.com/spf13/pflag"
@@ -17,16 +19,34 @@ func main() {
 
 	pflag.Parse()
 
-	if namespace == "" {
-		fmt.Println("Error: Please specify a namespace useing the '--namespace' flag.")
+	args := pflag.Args()
+	if len(args) < 2 {
+		fmt.Println("Error: Please specify the resource type and resource name as arguments.")
 		os.Exit(1)
 	}
 
-	err := knockout.TerminateNamespace(namespace, kubeconfig)
+	resourceType := args[0]
+	resourceName := args[1]
+
+	// Determine the default kubeconfig file path
+	if kubeconfig == "" {
+		kubeconfig = getDefaultKubeconfigPath()
+	}
+
+	err := knockout.DeleteFinalizers(resourceType, resourceName, namespace, kubeconfig)
 	if err != nil {
-		fmt.Printf("Error finishing namespace '%s': %v\n", namespace, err)
+		fmt.Printf("Error terminating resource %s: %v\n", namespace, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Namespace '%s' finished successfully.\n", namespace)
+	fmt.Printf("%s %s finished successfully.\n", resourceType, resourceName)
+}
+
+// Returns the default kubeconfig file path.
+func getDefaultKubeconfigPath() string {
+	usr, err := user.Current()
+	if err != nil {
+		return filepath.Join("~", ".kube", "config")
+	}
+	return filepath.Join(usr.HomeDir, ".kube", "config")
 }
